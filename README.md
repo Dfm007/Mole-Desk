@@ -3,7 +3,7 @@
 Mole 的 macOS 图形界面外壳。Mole 源码和运行文件已经内置在 `Vendor/Mole`，构建时会自动打包进 App。
 
 - 开发者：Dfm007
-- 版本：1.0.0
+- 版本：1.0.1
 - GitHub：<https://github.com/Dfm007/Mole-Desk>
 
 ## 界面预览
@@ -56,7 +56,7 @@ Mole 的 macOS 图形界面外壳。Mole 源码和运行文件已经内置在 `V
 
 打包后 `Mole Desk.app` 可以单独拷贝到其他 Intel Mac 使用。运行时产生的配置、白名单和日志仍保存在当前用户的 `~/.config/mole` 与 `~/Library/Logs/mole`。
 
-当前构建为 x86_64，目标系统为 macOS 26+。Apple Silicon 机器需要 Rosetta 2，或另行构建 arm64 版本。
+当前构建为 x86_64，最低系统为 macOS 15+，同一个 DMG 可运行在 macOS 15 和 macOS 26 上。内置 `status-go` 的最低系统版本也是 15.0。Apple Silicon 机器需要 Rosetta 2，或另行构建 arm64 版本。
 
 ## 更新 Mole
 

@@ -11,7 +11,9 @@ if [[ ! -x "$MOLE_SRC/mole" ]]; then
 fi
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-xcrun swiftc -parse-as-library -swift-version 5 -O "$ROOT/Sources/MoleDesk.swift" \
+xcrun swiftc -parse-as-library -swift-version 5 -O \
+  -target x86_64-apple-macosx15.0 \
+  "$ROOT/Sources/MoleDesk.swift" \
   -o "$APP/Contents/MacOS/MoleDesk" \
   -framework SwiftUI -framework AppKit -framework Charts
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"

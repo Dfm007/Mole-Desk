@@ -1,0 +1,12 @@
+#!/bin/bash
+# Mole Desk compatibility shim: some Hackintosh Bluetooth stacks make
+# `system_profiler SPBluetoothDataType` hang indefinitely. Status already has
+# a fallback path, so return an empty Bluetooth section and delegate everything
+# else to the real system_profiler.
+case " $* " in
+    *" SPBluetoothDataType "*)
+        printf 'Bluetooth:\n'
+        exit 0
+        ;;
+esac
+exec /usr/sbin/system_profiler "$@"

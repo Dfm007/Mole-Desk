@@ -1,0 +1,15 @@
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Build artifacts
+*.app
+Mole Desk.app/
+dist/
+build/
+
+# Temporary GUI preview captures
+preview-*.png
+
+# Release image
+*.dmg

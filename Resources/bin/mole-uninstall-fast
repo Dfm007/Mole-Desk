@@ -1,0 +1,124 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MOLE_ROOT="${MOLE_ROOT:-$SCRIPT_DIR/../Mole}"
+
+if [[ ! -f "$MOLE_ROOT/bin/uninstall.sh" ]]; then
+    echo "Mole runtime missing: $MOLE_ROOT/bin/uninstall.sh" >&2
+    exit 1
+fi
+
+# Sourcing loads Mole's complete uninstall safety, preview, removal, and
+# operation-log machinery without running its full application inventory scan.
+source "$MOLE_ROOT/bin/uninstall.sh"
+
+if ! declare -F batch_uninstall_applications >/dev/null; then
+    echo "Mole uninstall API is unavailable; update Mole Desk's fast uninstall helper" >&2
+    exit 1
+fi
+
+if [[ "${1:-}" == "--check-api" ]]; then
+    for function_name in batch_uninstall_applications uninstall_live_bundle_has_other_install; do
+        if ! declare -F "$function_name" >/dev/null; then
+            echo "Mole uninstall API missing: $function_name" >&2
+            exit 1
+        fi
+    done
+    trap - EXIT INT TERM
+    echo "mole-fast-uninstall-api-ok"
+    exit 0
+fi
+
+dry_run=0
+with_data=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run) dry_run=1; shift ;;
+        --with-data) with_data=1; shift ;;
+        --) shift; break ;;
+        *) break ;;
+    esac
+done
+
+if [[ $# -ne 3 ]]; then
+    echo "Usage: mole-uninstall-fast [--dry-run] [--with-data] APP_PATH APP_NAME BUNDLE_ID" >&2
+    exit 64
+fi
+
+app_path="$1"
+app_name="$2"
+bundle_id="$3"
+
+if [[ "$app_path" != /* || ! -e "$app_path" ]]; then
+    echo "Application is no longer available at: $app_path" >&2
+    exit 1
+fi
+
+# System applications use Apple bundle identifiers. For an ordinary third-party
+# app, walking all of /System/Applications only adds latency and cannot reveal a
+# realistic same-bundle sibling. Keep every other Mole sibling root, including
+# external volumes, and keep the full scan for Apple bundles.
+if [[ "$bundle_id" != com.apple.* ]]; then
+    filtered_roots=()
+    for root in "${_MOLE_UNINSTALL_LIVE_APP_ROOTS[@]+"${_MOLE_UNINSTALL_LIVE_APP_ROOTS[@]}"}"; do
+        [[ "$root" == "/System/Applications" ]] && continue
+        filtered_roots+=("$root")
+    done
+    _MOLE_UNINSTALL_LIVE_APP_ROOTS=("${filtered_roots[@]}")
+fi
+
+# Spotlight resolves an exact bundle-id lookup in milliseconds. When it has
+# indexed the selected /Applications bundle and reports no other .app with the
+# same id, skip Mole's expensive machine-wide sibling walk. Anything ambiguous
+# (missing selected path, extra match, unavailable Spotlight) keeps the full
+# safety scan unchanged.
+if [[ "$bundle_id" != com.apple.* && "$app_path" == /Applications/*.app ]]; then
+    spotlight_matches=""
+    spotlight_rc=0
+    spotlight_matches=$(/usr/bin/mdfind "kMDItemCFBundleIdentifier == '$bundle_id'" 2>/dev/null) || spotlight_rc=$?
+    if [[ $spotlight_rc -eq 0 ]]; then
+        spotlight_selected=false
+        spotlight_other=false
+        while IFS= read -r spotlight_path; do
+            [[ "$spotlight_path" == *.app ]] || continue
+            if [[ "$spotlight_path" == "$app_path" ]]; then
+                spotlight_selected=true
+            else
+                spotlight_other=true
+            fi
+        done <<< "$spotlight_matches"
+        if [[ "$spotlight_selected" == true && "$spotlight_other" == false ]]; then
+            uninstall_live_bundle_has_other_install() {
+                _MOLE_UNINSTALL_LIVE_SIBLING_FINGERPRINT=""
+                _MOLE_UNINSTALL_LIVE_SIBLING_PATHS=()
+                _MOLE_UNINSTALL_SCAN_UNREADABLE=""
+                return 1
+            }
+        fi
+    fi
+fi
+
+export MOLE_CURRENT_COMMAND="uninstall"
+export MOLE_DELETE_MODE="${MOLE_DELETE_MODE:-trash}"
+export MOLE_UNINSTALL_WITH_DATA="$with_data"
+export MOLE_UNINSTALL_FAILED_APPS=0
+[[ "$dry_run" == "1" ]] && export MOLE_DRY_RUN=1
+
+# The batch flow re-validates the bundle, discovers leftovers, requests admin
+# access only when needed, and performs the same protected removal as Mole.
+selected_apps=("0|$app_path|$app_name|$bundle_id|||0")
+apps_data=("${selected_apps[@]}")
+selection_state=(false)
+
+log_operation_session_start "uninstall"
+hide_cursor
+if [[ "$dry_run" == "1" ]]; then
+    echo -e "${YELLOW}${ICON_DRY_RUN} DRY RUN MODE${NC}, No app files or settings will be modified"
+    printf '\n'
+fi
+
+rc=0
+batch_uninstall_applications || rc=$?
+show_cursor
+exit "$rc"

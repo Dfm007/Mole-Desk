@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+
+/usr/bin/osascript \
+    -e 'set answer to display dialog "Mole Desk 需要管理员权限来移除应用及其系统级残留文件。" default answer "" with title "Mole Desk" with icon caution with hidden answer buttons {"取消", "继续"} default button "继续"' \
+    -e 'return text returned of answer'

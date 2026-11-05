@@ -1439,8 +1439,10 @@ private func whitelistPathMatches(_ candidate: String, pattern: String) -> Bool 
         // (for example DerivedData while the whitelist protects DerivedData/*).
         // Mole protects that parent as well, so the GUI must classify it the same way.
         if let globIndex = normalizedPattern.firstIndex(where: { "*?[".contains($0) }) {
-            let staticPrefix = String(normalizedPattern[..<globIndex])
-                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            var staticPrefix = String(normalizedPattern[..<globIndex])
+            while staticPrefix.count > 1 && staticPrefix.hasSuffix("/") {
+                staticPrefix.removeLast()
+            }
             if !staticPrefix.isEmpty {
                 return path == staticPrefix || staticPrefix.hasPrefix(path + "/")
             }

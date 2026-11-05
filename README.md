@@ -3,7 +3,7 @@
 Mole 的 macOS 图形界面外壳。Mole 源码和运行文件已经内置在 `Vendor/Mole`，构建时会自动打包进 App。
 
 - 开发者：Dfm007
-- 版本：1.0.1
+- 版本：1.0.2
 - GitHub：<https://github.com/Dfm007/Mole-Desk>
 
 ## 界面预览

@@ -1417,17 +1417,40 @@ private func expandWhitelistPath(_ raw: String) -> String {
 }
 
 private func whitelistPathMatches(_ candidate: String, pattern: String) -> Bool {
-    let path = expandWhitelistPath(candidate)
-    let hasGlob = pattern.contains("*") || pattern.contains("?") || pattern.contains("[")
+    var path = expandWhitelistPath(candidate)
+    while path.count > 1 && path.hasSuffix("/") {
+        path.removeLast()
+    }
+    var normalizedPattern = expandWhitelistPath(pattern)
+    while normalizedPattern.count > 1 && normalizedPattern.hasSuffix("/") {
+        normalizedPattern.removeLast()
+    }
+    let hasGlob = normalizedPattern.contains("*") || normalizedPattern.contains("?") || normalizedPattern.contains("[")
+
     if hasGlob {
-        return pattern.withCString { patternPointer in
+        let matchesGlob = normalizedPattern.withCString { patternPointer in
             path.withCString { pathPointer in
                 fnmatch(patternPointer, pathPointer, 0) == 0
             }
         }
+        if matchesGlob { return true }
+
+        // A row may describe the parent directory of the protected path
+        // (for example DerivedData while the whitelist protects DerivedData/*).
+        // Mole protects that parent as well, so the GUI must classify it the same way.
+        if let globIndex = normalizedPattern.firstIndex(where: { "*?[".contains($0) }) {
+            let staticPrefix = String(normalizedPattern[..<globIndex])
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            if !staticPrefix.isEmpty {
+                return path == staticPrefix || staticPrefix.hasPrefix(path + "/")
+            }
+        }
+        return false
     }
-    let normalizedPattern = pattern.hasSuffix("/") ? String(pattern.dropLast()) : pattern
-    return path == normalizedPattern || path.hasPrefix(normalizedPattern + "/")
+
+    return path == normalizedPattern
+        || path.hasPrefix(normalizedPattern + "/")
+        || normalizedPattern.hasPrefix(path + "/")
 }
 
 private func firstMatch(in text: String, pattern: String) -> String? {
@@ -2021,7 +2044,13 @@ private struct CleanView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("扫描明细").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
+                        HStack(spacing: 10) {
+                            Text("扫描明细").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.text)
+                            Spacer()
+                            LegendDot(color: Theme.amber, text: "待清理")
+                            LegendDot(color: Theme.accent, text: "白名单")
+                            LegendDot(color: Theme.tertiary, text: "无需清理")
+                        }
                         ForEach(preview.sections) { section in
                             VStack(alignment: .leading, spacing: 7) {
                                 Text(section.title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.accent)
@@ -2167,8 +2196,8 @@ private struct OptimizePreviewView: View {
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(Theme.amber)
                 Spacer()
-                OptimizeLegendDot(color: Theme.amber, text: "待执行")
-                OptimizeLegendDot(color: Theme.accent, text: "不执行/诊断")
+                LegendDot(color: Theme.amber, text: "待执行")
+                LegendDot(color: Theme.accent, text: "不执行/诊断")
             }
             .padding(.bottom, 2)
 
@@ -2214,7 +2243,7 @@ private struct OptimizePreviewView: View {
 
 }
 
-private struct OptimizeLegendDot: View {
+private struct LegendDot: View {
     let color: Color
     let text: String
 
